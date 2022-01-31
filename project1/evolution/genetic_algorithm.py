@@ -1,16 +1,18 @@
+import time
 from typing import Callable
 
 import numpy as np
 import matplotlib.pyplot as plt
 from prettytable import PrettyTable
 
+from fitness.fitness_functions import FitnessFunction
+
 
 class GeneticAlgorithm:
     def __init__(self,
                  population_size: int = 32,
                  n_bits: int = 8,
-                 fitness_function: Callable = None,
-                 fitness_interval: tuple[int, int] = (0, 128),
+                 fitness_function: FitnessFunction = None,
                  maximize: bool = True,
                  p_cross_over: float = 0.6,
                  p_mutation: float = 0.05):
@@ -18,7 +20,6 @@ class GeneticAlgorithm:
         :param population_size: Number of individuals in population.
         :param n_bits: Number of bits used to represent each individual.
         :param fitness_function: Fitness function to use during evolution.
-        :param fitness_interval: Interval of the fitness function (passed to the fitness function when computing).
         :param maximize: Whether or not to maximize fitness (otherwise minimize).
         :param p_cross_over: Probability of crossover of two parents.
         :param p_mutation: Probability of mutating offspring.
@@ -30,18 +31,17 @@ class GeneticAlgorithm:
         if fitness_function is None:
             raise TypeError('fitness_function must be specified')
 
-        self.fitness_function: Callable = fitness_function
-        self.fitness_interval = fitness_interval
+        self.fitness_function: FitnessFunction = fitness_function
         self.maximize: bool = maximize
         self.p_cross_over: float = p_cross_over
         self.p_mutation: float = p_mutation
 
-        self.population: np.ndarray = self._init_population(population_size, n_bits)
+        self.population: np.ndarray = self.init_population(population_size, n_bits)
         self.population_history: list[np.ndarray] = []
         self.fitness_history: list[np.ndarray] = []
 
-
-    def _init_population(self, population_size: int, n_bits: int) -> np.ndarray:
+    @classmethod
+    def init_population(cls, population_size: int, n_bits: int) -> np.ndarray:
         """Initializes population of size (n_individuals x n_bits).
 
         Assignment task a).
@@ -53,22 +53,13 @@ class GeneticAlgorithm:
 
         return np.random.random_integers(0, 1, (population_size, n_bits))
 
-    def _get_fitness(self) -> np.ndarray:
-        """Calculates fitness by passing in current population
-        along with the specified interval to the fitness function.
-
-        :return: A numpy array of the fitness of the whole population.
-        """
-
-        return self.fitness_function(population=self.population, interval=self.fitness_interval)
-
     def _get_fitness_stats(self) -> np.ndarray:
         """Calculates fitness of whole population and returns sum, max, and mean of these.
 
         :return: A (3x1) numpy array of the sum, max, and mean of the fitness of the population.
         """
 
-        fitness: np.ndarray = self._get_fitness()
+        fitness: np.ndarray = self.fitness_function(population=self.population)
         return np.array([fitness.sum(), fitness.max(), fitness.mean()])
 
     def _get_selection_probabilities(self, fitness: np.ndarray) -> np.ndarray:
@@ -88,7 +79,7 @@ class GeneticAlgorithm:
         :return: A multiset chosen from the current population.
         """
 
-        fitness = self._get_fitness()
+        fitness =  self.fitness_function(population=self.population)
         probabilities = self._get_selection_probabilities(fitness)
         indeces = np.random.choice(len(self.population), size=len(self.population), replace=True, p=probabilities)
         return self.population[indeces]
@@ -150,6 +141,17 @@ class GeneticAlgorithm:
         self.population_history = []
         self.fitness_history = []
 
+        if visualize:
+            plt.ion()
+            fig, ax = plt.subplots(figsize=(12, 12))
+            interval = self.fitness_function.interval
+            x_func = np.linspace(interval[0], interval[1], 10*(interval[1] - interval[0]))
+            y_func = self.fitness_function.fitness(x_func)
+            ax.plot(x_func, y_func)
+            ax.set_xlabel('Value')
+            ax.set_ylabel('Fitness')
+            points, = ax.plot(x_func, y_func, 'ro')
+
         for g in range(generations):
             print(f'Generation {g}')
             fitness_stats = self._get_fitness_stats()
@@ -158,6 +160,16 @@ class GeneticAlgorithm:
                 fitness_table = PrettyTable(['Sum', 'Max', 'Mean'], title='Fitness')
                 fitness_table.add_row([round(s, 2) for s in fitness_stats])
                 print(fitness_table)
+
+            if visualize:
+                ax.set_title(f'Generation {g}')
+                x = self.fitness_function.bits_to_scaled_nums(self.population)
+                y = self.fitness_function(self.population)
+                points.set_xdata(x)
+                points.set_ydata(y)
+                fig.canvas.draw()
+                fig.canvas.flush_events()
+                time.sleep(0.5)
 
             self.population_history.append(self.population.copy())
             parents = self._parent_selection()
@@ -173,7 +185,7 @@ class GeneticAlgorithm:
 
         For each generation the sum, max, and mean of fitness over the whole generation is plotted.
         """
-
+        plt.ioff()
         fig, ax = plt.subplots(1, 3, figsize=(12, 12))
         for i, f in enumerate(['Sum', 'Max', 'Mean']):
             ax[i].plot(self.fitness_history[:, i])

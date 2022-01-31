@@ -1,69 +1,148 @@
+from abc import ABC, abstractmethod
+
 import numpy as np
 
 
-def _bits_to_num(bits: np.ndarray) -> np.ndarray:
-    """Converts Nxb array of bits into a Nx1 vector of numbers.
-
-    :param bits:A (Nxb) numpy array of bits.
-                N: number of rows of bits, b: number of bits in each row.
-    :return: A (Nx1) numpy array containing the number each of the rows represent
-    """
-    return np.dot(bits, 2 ** np.arange(bits.shape[1])[::-1])
+class FitnessFunction(ABC):
+    pass
 
 
-def _scale_nums(nums: np.ndarray, from_interval: tuple, to_interval: tuple) -> np.ndarray:
-    """Scales a numpy array of nums from one interval to the another
+class RealValueFitnessFunction(FitnessFunction):
+    def __init__(self, interval: tuple[int, int] = (0, 16)):
+        self.interval = interval
 
-    :param nums: A (Nx1) numpy array of numbers.
-    :param from_interval: A tuple (low, high) of the original interval.
-    :param to_interval: A tuple (low, high) of the interval the numbers should be scaled to.
-    :return: A scaled (Nx1) numpy array of numbers.
-    """
-    return nums * (to_interval[1] - to_interval[0]) / (from_interval[1] - from_interval[0]) + to_interval[0]
+    @classmethod
+    def bits_to_num(cls, bits: np.ndarray) -> np.ndarray:
+        """Converts Nxb array of bits into a Nx1 vector of numbers.
+
+        This is done by taking the dot product with a 2-power vector.
+
+        :param bits:A (Nxb) numpy array of bits.
+                    N: number of rows of bits, b: number of bits in each row.
+        :return: A (Nx1) numpy array containing the number each of the rows represent
+        """
+        return np.dot(bits, 2 ** np.arange(bits.shape[1])[::-1])
+
+    @classmethod
+    def scale_nums(cls, nums: np.ndarray, from_interval: tuple[int, int], to_interval: tuple[int, int]) -> np.ndarray:
+        """Scales a numpy array of nums from one interval to the another
+
+        :param nums: A (Nx1) numpy array of numbers.
+        :param from_interval: A tuple (low, high) of the original interval.
+        :param to_interval: A tuple (low, high) of the interval the numbers should be scaled to.
+        :return: A scaled (Nx1) numpy array of numbers.
+        """
+        return nums * (to_interval[1] - to_interval[0]) / (from_interval[1] - from_interval[0]) + to_interval[0]
+
+    def bits_to_scaled_nums(self, bits: np.ndarray):
+        # Dot product with 2-powered array to decode the bits into a real value.
+        nums = self.bits_to_num(bits)
+
+        # Scale interval
+        original_interval = (0, 2 ** bits.shape[1] - 1)
+
+        return self.scale_nums(nums, from_interval=original_interval, to_interval=self.interval)
+
+    @abstractmethod
+    def fitness(self, phenome: np.ndarray) -> np.ndarray:
+        """Calculates fitness of a population using the population's phenomes (real values).
+
+        :param phenome: A (Nx1) numpy array consisting of a populations phenomes.
+        :return: A (Nx1) numpy array consisting of the fitness of the population.
+        """
+
+        raise NotImplementedError('Subclasses must implement fitness_function()')
+
+    def __call__(self, population: np.ndarray) -> np.ndarray:
+        """Calculates fitness of a population using the population's genomes (bits).
+
+        :param population:  A (Nxb) numpy array a population's genomes.
+                            N: number of individuals in population, b: number of bits representing each individual.
+        :return: A (Nx1) numpy array consisting of the fitness of the population.
+        """
+
+        phenome = self.bits_to_scaled_nums(population)
+        return self.fitness(phenome)
+
+class SineFitness(RealValueFitnessFunction):
+    """Fitness function using sin(x)."""
+
+    def fitness(self, phenome: np.ndarray) -> np.ndarray:
+        """Calculates fitness of a population according to sin(x).
+
+        :param phenome: A (Nx1) numpy array consisting of a populations phenomes.
+        :return: A (Nx1) numpy array consisting of the fitness (sin(x)) of the population.
+        """
+
+        return np.sin(phenome) + 1  # Add 1 to force non-negative fitness values
 
 
-def x2(population: np.ndarray, interval: tuple = (0, 16)) -> np.ndarray:
-    """Finds the fitness of each individual in a population where the goal is to maximize x**2.
+class SquaredFitness(RealValueFitnessFunction):
+    """Fitness function using x**2"""
 
-    Each individual has its genome (bitstring) decoded into a phenome (real number value).
-    Then, the phenome interval is scaled before calculating fitness.
+    def fitness(self, phenome: np.ndarray) -> np.ndarray:
+        """Calculates fitness of a population according to x**2.
 
-    :param population:  A (Nxb) numpy array with a set of individuals.
-                        N: number of individuals, b: number of bits in the genome.
-    :param interval: A tuple (low, high) of the interval the numbers should be scaled to.
-    :return: A (Nx1) numpy array containing the fitness score of each individual.
-    """
-
-    # Dot product with 2-powered array to decode the genome into a phenome.
-    phenome = _bits_to_num(population)
-
-    # Scale interval
-    original_interval = (2 ** population.shape[1] - 1, 0)
-
-    scaled_phenome = _scale_nums(phenome, from_interval=original_interval, to_interval=interval)
-    return scaled_phenome ** 2
+        :param phenome: A (Nx1) numpy array consisting of a populations phenomes.
+        :return: A (Nx1) numpy array consisting of the fitness (x**2) of the population.
+        """
+        return phenome ** 2
 
 
-def sin(population: np.ndarray, interval: tuple = (0, 128)) -> np.ndarray:
-    """Finds the fitness of each individual in a population where the goal is to maximize sin(x).
+class CubedFitness(RealValueFitnessFunction):
+    """Fitness function using x**3."""
 
-    Each individual has its genome (bitstring) decoded into a phenome (real number value) before calculating fitness.
+    def fitness(self, phenome: np.ndarray) -> np.ndarray:
+        """Calculates fitness of a population according to x**3
 
-    :param population:  A (Nxb) numpy array with a set of individuals.
-                        N: number of individuals, b: number of bits in the genome.
-    :param interval: A tuple (low, high) of the interval the numbers should be scaled to.
-    :return: A (Nx1) numpy array containing the fitness score of each individual.
-    """
+        :param phenome: A (Nx1) numpy array consisting of a populations phenomes.
+        :return: A (Nx1) numpy array consisting of the fitness (x**3) of the population.
+        """
 
-    # Dot product with 2-powered array to decode the genome into a phenome.
-    phenome = _bits_to_num(population)
+        return phenome ** 3
 
-    # Scale interval
-    original_interval = (2 ** population.shape[1] - 1, 0)
 
-    scaled_phenome = _scale_nums(phenome, from_interval=original_interval, to_interval=interval)
+class PolynomialFitness(RealValueFitnessFunction):
+    """Fitness function using cos(x)."""
+    def __init__(self, interval: tuple[int, int], a: float, b: float, c: float):
+        super().__init__(interval)
+        self.a = a
+        self.b = b
+        self.c = c
 
-    return np.sin(scaled_phenome) + 1  # Add 1 to make all fitness scores non-negative
+    def fitness(self, phenome: np.ndarray) -> np.ndarray:
+        """Calculates fitness of a population according to the polynomial ax**2 + bx + c.
+
+        :param phenome: A (Nx1) numpy array consisting of a populations phenomes.
+        :return: A (Nx1) numpy array consisting of the fitness (ax**2 + bx + c) of the population.
+        """
+
+        return self.a * phenome ** 2 + self.b * phenome + self.c
+
+
+class CosineFitness(RealValueFitnessFunction):
+    """Fitness function using cos(x)."""
+
+    def fitness(self, phenome: np.ndarray) -> np.ndarray:
+        """Calculates fitness of a population according to cos(x)
+
+        :param phenome: A (Nx1) numpy array consisting of a populations phenomes.
+        :return: A (Nx1) numpy array consisting of the fitness (x**3) of the population.
+        """
+
+        return np.cos(phenome) + 1  # Add 1 to force non-negative fitness values
+
+
+class LinearWithSineFitness(RealValueFitnessFunction):
+    """Fitness function using cos(x)."""
+    def fitness(self, phenome: np.ndarray) -> np.ndarray:
+        """Calculates fitness of a population according to the polynomial ax**2 + bx + c.
+
+        :param phenome: A (Nx1) numpy array consisting of a populations phenomes.
+        :return: A (Nx1) numpy array consisting of the fitness (ax**2 + bx + c) of the population.
+        """
+
+        return phenome + np.sin(phenome) + 1
 
 
 if __name__ == '__main__':
@@ -76,5 +155,7 @@ if __name__ == '__main__':
         [1, 1, 0, 0],  # 12
         [1, 1, 1, 1],  # 15
     ])
-    print("x2: ", x2(p))
-    print("sin: ", sin(p))
+    x2 = SquaredFitness()
+    sin = SineFitness()
+    print("x2: ", x2.fitness(p))
+    print("sin: ", sin.fitness(p))
