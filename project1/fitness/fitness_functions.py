@@ -51,6 +51,7 @@ def sin(population: np.ndarray, interval: tuple = (0, 128)) -> np.ndarray:
 
     :param population:  A (Nxb) numpy array with a set of individuals.
                         N: number of individuals, b: number of bits in the genome.
+    :param interval: A tuple (low, high) of the interval the numbers should be scaled to.
     :return: A (Nx1) numpy array containing the fitness score of each individual.
     """
 
@@ -62,7 +63,7 @@ def sin(population: np.ndarray, interval: tuple = (0, 128)) -> np.ndarray:
 
     scaled_phenome = _scale_nums(phenome, from_interval=original_interval, to_interval=interval)
 
-    return np.sin(scaled_phenome)
+    return np.sin(scaled_phenome) + 1  # Add 1 to make all fitness scores non-negative
 
 
 if __name__ == '__main__':
