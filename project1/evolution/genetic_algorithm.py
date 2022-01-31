@@ -1,18 +1,15 @@
 import time
-from typing import Callable
 
 import numpy as np
 import matplotlib.pyplot as plt
 from prettytable import PrettyTable
-
-from fitness.fitness_functions import FitnessFunction
 
 
 class GeneticAlgorithm:
     def __init__(self,
                  population_size: int = 32,
                  n_bits: int = 8,
-                 fitness_function: FitnessFunction = None,
+                 fitness_function=None,
                  maximize: bool = True,
                  p_cross_over: float = 0.6,
                  p_mutation: float = 0.05):
@@ -31,14 +28,17 @@ class GeneticAlgorithm:
         if fitness_function is None:
             raise TypeError('fitness_function must be specified')
 
-        self.fitness_function: FitnessFunction = fitness_function
+        self.fitness_function = fitness_function
         self.maximize: bool = maximize
         self.p_cross_over: float = p_cross_over
         self.p_mutation: float = p_mutation
 
         self.population: np.ndarray = self.init_population(population_size, n_bits)
+
+        # Used to store histories during fit
         self.population_history: list[np.ndarray] = []
         self.fitness_history: list[np.ndarray] = []
+        self.entropy_history: list[float] = []
 
     @classmethod
     def init_population(cls, population_size: int, n_bits: int) -> np.ndarray:
@@ -125,6 +125,9 @@ class GeneticAlgorithm:
         mutated_population[idx] = 1 - mutated_population[idx]
         return mutated_population
 
+    def _calculate_entropy(self, population: np.ndarray) -> float:
+        pass
+
     def fit(self, generations: int = 100, verbose=False, visualize=False) -> None:
         """Fits the population through a generational loop.
 
@@ -164,7 +167,7 @@ class GeneticAlgorithm:
             if visualize:
                 ax.set_title(f'Generation {g}')
                 x = self.fitness_function.bits_to_scaled_nums(self.population)
-                y = self.fitness_function(self.population)
+                y = self.fitness_function.fitness(x)
                 points.set_xdata(x)
                 points.set_ydata(y)
                 fig.canvas.draw()

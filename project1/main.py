@@ -8,7 +8,7 @@ from data_utils.dataset import Dataset
 dataset = Dataset.read_file('dataset.txt')
 #model = LinReg()
 
-fitness_function = LinearWithSineFitness(interval=(0, 128))
+fitness_function = SineFitness(interval=(0, 128), target_interval=(20, 25), distance_factor=0.1)
 
 ga = GeneticAlgorithm(
     population_size=32,

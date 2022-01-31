@@ -8,8 +8,14 @@ class FitnessFunction(ABC):
 
 
 class RealValueFitnessFunction(FitnessFunction):
-    def __init__(self, interval: tuple[int, int] = (0, 16)):
+    def __init__(self,
+                 interval: tuple[int, int] = (0, 16),
+                 target_interval: tuple[int, int] = None,
+                 distance_factor: float = 0.05
+                 ):
         self.interval = interval
+        self.target_interval = target_interval
+        self.distance_factor = distance_factor
 
     @classmethod
     def bits_to_num(cls, bits: np.ndarray) -> np.ndarray:
@@ -53,6 +59,20 @@ class RealValueFitnessFunction(FitnessFunction):
 
         raise NotImplementedError('Subclasses must implement fitness_function()')
 
+    def _distance_to_target(self, phenome: np.ndarray) -> np.ndarray:
+        if self.target_interval is not None:
+            distance_penalties = []
+            for p in phenome:
+                distance_penalty = 0
+                if p > self.target_interval[1]:
+                    distance_penalty = abs(p - self.target_interval[1])
+                elif p < self.target_interval[0]:
+                    distance_penalty = abs(p - self.target_interval[1])
+                distance_penalties.append(self.distance_factor * distance_penalty)
+            return np.array(distance_penalties)
+        else:
+            return 0
+
     def __call__(self, population: np.ndarray) -> np.ndarray:
         """Calculates fitness of a population using the population's genomes (bits).
 
@@ -62,7 +82,10 @@ class RealValueFitnessFunction(FitnessFunction):
         """
 
         phenome = self.bits_to_scaled_nums(population)
-        return self.fitness(phenome)
+
+        fitness = self.fitness(phenome) - self._distance_to_target(phenome)
+        fitness = fitness.clip(min=0)
+        return fitness
 
 class SineFitness(RealValueFitnessFunction):
     """Fitness function using sin(x)."""
