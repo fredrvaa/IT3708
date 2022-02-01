@@ -1,11 +1,12 @@
 import time
+from abc import ABC, abstractmethod
 
 import numpy as np
 import matplotlib.pyplot as plt
 from prettytable import PrettyTable
 
 
-class GeneticAlgorithm:
+class GeneticAlgorithm(ABC):
     def __init__(self,
                  population_size: int = 32,
                  n_bits: int = 8,
@@ -51,7 +52,7 @@ class GeneticAlgorithm:
         :return: Numpy array of the whole population. Shape: (population_size x n_bits).
         """
 
-        return np.random.random_integers(0, 1, (population_size, n_bits))
+        return np.random.randint(0, 2, (population_size, n_bits))
 
     def _get_fitness_stats(self) -> np.ndarray:
         """Calculates fitness of whole population and returns sum, max, and mean of these.
@@ -73,21 +74,24 @@ class GeneticAlgorithm:
 
         return fitness / fitness.sum()
 
-    def _parent_selection(self):
+    def _parent_selection(self, population: np.ndarray):
         """Selects parents for the next generation of the population.
 
         :return: A multiset chosen from the current population.
         """
+        parent_population = population.copy()
 
-        fitness =  self.fitness_function(population=self.population)
+        fitness = self.fitness_function(population=parent_population)
         probabilities = self._get_selection_probabilities(fitness)
         indeces = np.random.choice(len(self.population), size=len(self.population), replace=True, p=probabilities)
-        return self.population[indeces]
+        parent_population = parent_population[indeces]
+        np.random.shuffle(parent_population)  # Shuffles the mating pool
+        return parent_population
 
     def _cross_over(self, popultation: np.ndarray) -> np.ndarray:
         """Performs cross over for a whole population.
 
-        The population is first shuffled, then two and two individuals are crossed. If the population contains an odd
+        Two and two individuals are crossed. If the population contains an odd
         number of individuals, the last one is not crossed, and just passes through.
 
         This should be done after selection.
@@ -99,7 +103,6 @@ class GeneticAlgorithm:
         """
 
         crossed_population = popultation.copy()
-        np.random.shuffle(crossed_population)  # Shuffles the mating pool
         for p1, p2 in zip(crossed_population[::2], crossed_population[1::2]):
             if np.random.random() < self.p_cross_over:
                 c = np.random.randint(1, self.n_bits)  # Random cross over point
@@ -127,6 +130,10 @@ class GeneticAlgorithm:
 
     def _calculate_entropy(self, population: np.ndarray) -> float:
         pass
+
+    @abstractmethod
+    def _survivor_selection(self, parents: np.ndarray, offspring: np.ndarray) -> np.ndarray:
+        raise NotImplementedError('Subclass must implement _survivor_selection() method.')
 
     def fit(self, generations: int = 100, verbose=False, visualize=False) -> None:
         """Fits the population through a generational loop.
@@ -175,10 +182,10 @@ class GeneticAlgorithm:
                 time.sleep(0.5)
 
             self.population_history.append(self.population.copy())
-            parents = self._parent_selection()
+            parents = self._parent_selection(self.population)
             crossed = self._cross_over(parents)
             mutated = self._mutate(crossed)
-            self.population = mutated
+            self.population = self._survivor_selection(parents, mutated)
 
         self.population_history = np.asarray(self.population_history)
         self.fitness_history = np.asarray(self.fitness_history)
@@ -200,5 +207,69 @@ class GeneticAlgorithm:
         plt.show()
 
 
+class SimpleGeneticAlgorithm(GeneticAlgorithm):
+    def _survivor_selection(self, parents: np.ndarray, offspring: np.ndarray) -> np.ndarray:
+        return offspring
+
+
+class GeneralizedCrowding(GeneticAlgorithm):
+    def __init__(self, scaling_factor: float = 0.5, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self._scaling_factor = scaling_factor
+
+    @staticmethod
+    def hamming_distance(a1: np.ndarray, a2: np.ndarray) -> int:
+        return np.count_nonzero(a1 != a2)
+
+    def _competition(self, parent: np.ndarray, offspring: np.ndarray) -> np.ndarray:
+        offspring_fitness = self.fitness_function(offspring)
+        parent_fitness = self.fitness_function(parent)
+
+        if offspring_fitness > parent_fitness:
+            offspring_probability = offspring_fitness / (offspring_fitness + self._scaling_factor * parent_fitness)
+            return offspring if np.random.random() < offspring_probability else parent
+        elif offspring_fitness < parent_fitness:
+            scaled_offspring_fitness = self._scaling_factor * offspring_fitness
+            offspring_probability = scaled_offspring_fitness / (scaled_offspring_fitness + parent_fitness)
+            return offspring if np.random.random() < offspring_probability else parent
+        else:
+            return offspring if np.random.random() < 0.5 else parent
+
+    def _survivor_selection(self, parents: np.ndarray, offspring: np.ndarray) -> np.ndarray:
+        """
+        Parents: [p1, p2, p3]; Offspring: [o1, o2, o3]
+        Competitions: [(p1, o1)]
+        :param parents:
+        :param offspring:
+        :return:
+        """
+        survivor_population = offspring.copy()
+        for i, (p1, p2, o1, o2) in enumerate(zip(parents[::2], parents[1::2], offspring[::2], offspring[1::2])):
+            h1 = self.hamming_distance(p1, o1) + self.hamming_distance(p2, o2)
+            h2 = self.hamming_distance(p1, o2) + self.hamming_distance(p2, o1)
+            if h1 < h2:  # Competitions: [(p1, o1), (p2, o2)]
+                survivor_population[i] = self._competition(p1, o1)
+                survivor_population[i + 1] = self._competition(p2, o2)
+            else:  # Competitions: [(p1, o2), (p2, o1)]
+                survivor_population[i] = self._competition(p1, o2)
+                survivor_population[i + 1] = self._competition(p2, o1)
+
+        return survivor_population
+
+
+class DeterministicCrowding(GeneralizedCrowding):
+    def __init__(self, *args, **kwargs):
+        super().__init__(scaling_factor=0, *args, **kwargs)
+
+
+class ProbabilisticCrowding(GeneralizedCrowding):
+    def __init__(self, *args, **kwargs):
+        super().__init__(scaling_factor=1, *args, **kwargs)
+
+
 if __name__ == '__main__':
-    ga = GeneticAlgorithm()
+    def f(p):
+        return p.sum()
+
+    print(GeneralizedCrowding(fitness_function=f)._competition(np.array([1,1]), np.array([0,1])))
