@@ -41,8 +41,8 @@ class GeneticAlgorithm(ABC):
         self.fitness_history: list[np.ndarray] = []
         self.entropy_history: list[float] = []
 
-    @classmethod
-    def init_population(cls, population_size: int, n_bits: int) -> np.ndarray:
+    @staticmethod
+    def init_population(population_size: int, n_bits: int) -> np.ndarray:
         """Initializes population of size (n_individuals x n_bits).
 
         Assignment task a).
@@ -53,6 +53,12 @@ class GeneticAlgorithm(ABC):
         """
 
         return np.random.randint(0, 2, (population_size, n_bits))
+
+    @staticmethod
+    def calculate_entropy(population: np.ndarray, epsilon=1e-12) -> float:
+        probabilities = population.mean(axis=0)
+        probabilities = probabilities.clip(min=epsilon)
+        return -np.dot(probabilities, np.log2(probabilities))
 
     def _get_fitness_stats(self) -> np.ndarray:
         """Calculates fitness of whole population and returns sum, max, and mean of these.
@@ -128,8 +134,6 @@ class GeneticAlgorithm(ABC):
         mutated_population[idx] = 1 - mutated_population[idx]
         return mutated_population
 
-    def _calculate_entropy(self, population: np.ndarray) -> float:
-        pass
 
     @abstractmethod
     def _survivor_selection(self, parents: np.ndarray, offspring: np.ndarray) -> np.ndarray:
@@ -150,6 +154,7 @@ class GeneticAlgorithm(ABC):
 
         self.population_history = []
         self.fitness_history = []
+        self.entropy_history = []
 
         if visualize:
             plt.ion()
@@ -166,7 +171,11 @@ class GeneticAlgorithm(ABC):
             print(f'Generation {g}')
             fitness_stats = self._get_fitness_stats()
             self.fitness_history.append(fitness_stats)
+
+            entropy = self.calculate_entropy(self.population)
+            self.entropy_history.append(entropy)
             if verbose:
+                print(f'Entropy: {round(entropy, 2)}')
                 fitness_table = PrettyTable(['Sum', 'Max', 'Mean'], title='Fitness')
                 fitness_table.add_row([round(s, 2) for s in fitness_stats])
                 print(fitness_table)
@@ -189,6 +198,7 @@ class GeneticAlgorithm(ABC):
 
         self.population_history = np.asarray(self.population_history)
         self.fitness_history = np.asarray(self.fitness_history)
+        self.entropy_history = np.asarray(self.entropy_history)
 
     def visualize_fitness(self):
         """Visualizes fitness metrics from the last fit.
@@ -204,6 +214,15 @@ class GeneticAlgorithm(ABC):
 
             if i == 0:
                 ax[i].set_ylabel(f'Fitness')
+        plt.show()
+
+    def visualize_entropy(self):
+        plt.ioff()
+        fig, ax = plt.subplots(figsize=(12, 12))
+        ax.plot(self.entropy_history)
+        ax.set_title('Entropy')
+        ax.set_xlabel('Generation')
+        ax.set_ylabel(f'Entropy')
         plt.show()
 
 
@@ -272,4 +291,6 @@ if __name__ == '__main__':
     def f(p):
         return p.sum()
 
-    print(GeneralizedCrowding(fitness_function=f)._competition(np.array([1,1]), np.array([0,1])))
+    #print(GeneralizedCrowding(fitness_function=f)._competition(np.array([1,1]), np.array([0,1])))
+
+    print(GeneticAlgorithm.calculate_entropy(np.array([[1,0,1],[0,0,0], [1,1,0]])))

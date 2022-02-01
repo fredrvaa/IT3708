@@ -10,7 +10,7 @@ dataset = Dataset.read_file('dataset.txt')
 
 fitness_function = SineFitness(interval=(0, 128), target_interval=None, distance_factor=0.1)
 
-ga = ProbabilisticCrowding(
+ga = SimpleGeneticAlgorithm(
     population_size=200,
     n_bits=15,
     fitness_function=fitness_function,
@@ -18,7 +18,8 @@ ga = ProbabilisticCrowding(
     p_mutation=0.001
 )
 
-ga.fit(generations=100, verbose=True, visualize=True)
+ga.fit(generations=1000, verbose=True, visualize=False)
 ga.visualize_fitness()
+ga.visualize_entropy()
 
 #print(model.get_fitness(dataset.x, dataset.y))
