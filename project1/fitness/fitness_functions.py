@@ -27,7 +27,7 @@ class RealValueFitnessFunction(FitnessFunction):
                     N: number of rows of bits, b: number of bits in each row.
         :return: A (Nx1) numpy array containing the number each of the rows represent
         """
-        return np.dot(bits, 2 ** np.arange(bits.shape[1])[::-1])
+        return np.dot(bits, 2 ** np.arange(np.atleast_2d(bits).shape[1])[::-1])
 
     @classmethod
     def scale_nums(cls, nums: np.ndarray, from_interval: tuple[int, int], to_interval: tuple[int, int]) -> np.ndarray:
@@ -45,7 +45,7 @@ class RealValueFitnessFunction(FitnessFunction):
         nums = self.bits_to_num(bits)
 
         # Scale interval
-        original_interval = (0, 2 ** bits.shape[1] - 1)
+        original_interval = (0, 2 ** np.atleast_2d(bits).shape[1] - 1)
 
         return self.scale_nums(nums, from_interval=original_interval, to_interval=self.interval)
 
@@ -178,7 +178,13 @@ if __name__ == '__main__':
         [1, 1, 0, 0],  # 12
         [1, 1, 1, 1],  # 15
     ])
+    p2 = np.array([0, 0, 0, 0])
     x2 = SquaredFitness()
     sin = SineFitness()
     print("x2: ", x2.fitness(p))
     print("sin: ", sin.fitness(p))
+
+    print("x2: ", x2(p))
+    print("sin: ", sin(p))
+    print("x2: ", x2(p[0]))
+    print("sin: ", sin(p[0]))
