@@ -50,28 +50,25 @@ class RealValueFitnessFunction(FitnessFunction):
         return self.scale_nums(nums, from_interval=original_interval, to_interval=self.interval)
 
     @abstractmethod
-    def fitness(self, phenome: np.ndarray) -> np.ndarray:
+    def fitness(self, phenomes: np.ndarray) -> np.ndarray:
         """Calculates fitness of a population using the population's phenomes (real values).
 
-        :param phenome: A (Nx1) numpy array consisting of a populations phenomes.
+        :param phenomes: A (Nx1) numpy array consisting of a populations phenomes.
         :return: A (Nx1) numpy array consisting of the fitness of the population.
         """
 
         raise NotImplementedError('Subclasses must implement fitness_function()')
 
-    def _distance_to_target(self, phenome: np.ndarray) -> np.ndarray:
-        if self.target_interval is not None:
-            distance_penalties = []
-            for p in phenome:
-                distance_penalty = 0
-                if p > self.target_interval[1]:
-                    distance_penalty = abs(p - self.target_interval[1])
-                elif p < self.target_interval[0]:
-                    distance_penalty = abs(p - self.target_interval[1])
-                distance_penalties.append(self.distance_factor * distance_penalty)
-            return np.array(distance_penalties)
-        else:
-            return 0
+    def _distance_to_target(self, phenomes: np.ndarray) -> np.ndarray:
+        distance_penalties = []
+        for phenome in np.atleast_1d(phenomes):
+            distance_penalty = 0
+            if phenome > self.target_interval[1]:
+                distance_penalty = abs(phenome - self.target_interval[1])
+            elif phenome < self.target_interval[0]:
+                distance_penalty = abs(phenome - self.target_interval[1])
+            distance_penalties.append(self.distance_factor * distance_penalty)
+        return np.array(distance_penalties)
 
     def __call__(self, population: np.ndarray) -> np.ndarray:
         """Calculates fitness of a population using the population's genomes (bits).
@@ -81,48 +78,52 @@ class RealValueFitnessFunction(FitnessFunction):
         :return: A (Nx1) numpy array consisting of the fitness of the population.
         """
 
-        phenome = self.bits_to_scaled_nums(population)
+        phenomes = self.bits_to_scaled_nums(population)
 
-        fitness = self.fitness(phenome) - self._distance_to_target(phenome)
+        if self.target_interval is not None:
+            fitness = self.fitness(phenomes) - self._distance_to_target(phenomes)
+        else:
+            fitness = self.fitness(phenomes)
+
         fitness = fitness.clip(min=0)
         return fitness
 
 class SineFitness(RealValueFitnessFunction):
     """Fitness function using sin(x)."""
 
-    def fitness(self, phenome: np.ndarray) -> np.ndarray:
+    def fitness(self, phenomes: np.ndarray) -> np.ndarray:
         """Calculates fitness of a population according to sin(x).
 
-        :param phenome: A (Nx1) numpy array consisting of a populations phenomes.
+        :param phenomes: A (Nx1) numpy array consisting of a populations phenomes.
         :return: A (Nx1) numpy array consisting of the fitness (sin(x)) of the population.
         """
 
-        return np.sin(phenome) + 1  # Add 1 to force non-negative fitness values
+        return np.sin(phenomes) + 1  # Add 1 to force non-negative fitness values
 
 
 class SquaredFitness(RealValueFitnessFunction):
     """Fitness function using x**2"""
 
-    def fitness(self, phenome: np.ndarray) -> np.ndarray:
+    def fitness(self, phenomes: np.ndarray) -> np.ndarray:
         """Calculates fitness of a population according to x**2.
 
-        :param phenome: A (Nx1) numpy array consisting of a populations phenomes.
+        :param phenomes: A (Nx1) numpy array consisting of a populations phenomes.
         :return: A (Nx1) numpy array consisting of the fitness (x**2) of the population.
         """
-        return phenome ** 2
+        return phenomes ** 2
 
 
 class CubedFitness(RealValueFitnessFunction):
     """Fitness function using x**3."""
 
-    def fitness(self, phenome: np.ndarray) -> np.ndarray:
+    def fitness(self, phenomes: np.ndarray) -> np.ndarray:
         """Calculates fitness of a population according to x**3
 
-        :param phenome: A (Nx1) numpy array consisting of a populations phenomes.
+        :param phenomes: A (Nx1) numpy array consisting of a populations phenomes.
         :return: A (Nx1) numpy array consisting of the fitness (x**3) of the population.
         """
 
-        return phenome ** 3
+        return phenomes ** 3
 
 
 class PolynomialFitness(RealValueFitnessFunction):
@@ -133,23 +134,23 @@ class PolynomialFitness(RealValueFitnessFunction):
         self.b = b
         self.c = c
 
-    def fitness(self, phenome: np.ndarray) -> np.ndarray:
+    def fitness(self, phenomes: np.ndarray) -> np.ndarray:
         """Calculates fitness of a population according to the polynomial ax**2 + bx + c.
 
-        :param phenome: A (Nx1) numpy array consisting of a populations phenomes.
+        :param phenomes: A (Nx1) numpy array consisting of a populations phenomes.
         :return: A (Nx1) numpy array consisting of the fitness (ax**2 + bx + c) of the population.
         """
 
-        return self.a * phenome ** 2 + self.b * phenome + self.c
+        return self.a * phenomes ** 2 + self.b * phenomes + self.c
 
 
 class CosineFitness(RealValueFitnessFunction):
     """Fitness function using cos(x)."""
 
-    def fitness(self, phenome: np.ndarray) -> np.ndarray:
+    def fitness(self, phenomes: np.ndarray) -> np.ndarray:
         """Calculates fitness of a population according to cos(x)
 
-        :param phenome: A (Nx1) numpy array consisting of a populations phenomes.
+        :param phenomes: A (Nx1) numpy array consisting of a populations phenomes.
         :return: A (Nx1) numpy array consisting of the fitness (x**3) of the population.
         """
 
@@ -158,14 +159,14 @@ class CosineFitness(RealValueFitnessFunction):
 
 class LinearWithSineFitness(RealValueFitnessFunction):
     """Fitness function using cos(x)."""
-    def fitness(self, phenome: np.ndarray) -> np.ndarray:
+    def fitness(self, phenomes: np.ndarray) -> np.ndarray:
         """Calculates fitness of a population according to the polynomial ax**2 + bx + c.
 
-        :param phenome: A (Nx1) numpy array consisting of a populations phenomes.
+        :param phenomes: A (Nx1) numpy array consisting of a populations phenomes.
         :return: A (Nx1) numpy array consisting of the fitness (ax**2 + bx + c) of the population.
         """
 
-        return phenome + np.sin(phenome) + 1
+        return phenomes + np.sin(phenomes) + 1
 
 
 if __name__ == '__main__':
