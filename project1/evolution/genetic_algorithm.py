@@ -13,7 +13,8 @@ class GeneticAlgorithm(ABC):
                  fitness_function=None,
                  maximize: bool = True,
                  p_cross_over: float = 0.6,
-                 p_mutation: float = 0.05):
+                 p_mutation: float = 0.05,
+                 offspring_multiplier: int = 1):
         """
         :param population_size: Number of individuals in population.
         :param n_bits: Number of bits used to represent each individual.
@@ -21,6 +22,8 @@ class GeneticAlgorithm(ABC):
         :param maximize: Whether or not to maximize fitness (otherwise minimize).
         :param p_cross_over: Probability of crossover of two parents.
         :param p_mutation: Probability of mutating offspring.
+        :param offspring_multiplier: Decides how many offspring are created in each generation:
+                                     population_size is selected from population_size * offspring_multiplier offsprings
         """
 
         self.population_size: int = population_size
@@ -33,6 +36,7 @@ class GeneticAlgorithm(ABC):
         self.maximize: bool = maximize
         self.p_cross_over: float = p_cross_over
         self.p_mutation: float = p_mutation
+        self.offspring_multiplier = offspring_multiplier
 
         self.population: np.ndarray = self.init_population(population_size, n_bits)
 
@@ -89,7 +93,11 @@ class GeneticAlgorithm(ABC):
 
         fitness = self.fitness_function(population=parent_population)
         probabilities = self._get_selection_probabilities(fitness)
-        indeces = np.random.choice(len(self.population), size=len(self.population), replace=True, p=probabilities)
+        indeces = np.random.choice(len(fitness),
+                                   size=self.population_size,
+                                   replace=True,
+                                   p=probabilities)
+
         parent_population = parent_population[indeces]
         np.random.shuffle(parent_population)  # Shuffles the mating pool
         return parent_population
@@ -139,7 +147,13 @@ class GeneticAlgorithm(ABC):
     def _survivor_selection(self, parents: np.ndarray, offspring: np.ndarray) -> np.ndarray:
         raise NotImplementedError('Subclass must implement _survivor_selection() method.')
 
-    def fit(self, generations: int = 100, verbose=False, visualize=False) -> None:
+    def fit(self,
+            generations: int = 100,
+            termination_fitness: float = None,
+            verbose: bool = False,
+            visualize: bool = False,
+            vis_sleep: float = 0.1,
+            ) -> None:
         """Fits the population through a generational loop.
 
         For each generation the following is done:
@@ -148,8 +162,11 @@ class GeneticAlgorithm(ABC):
         3. Mutation
 
         :param generations: Number of generations the algorithm should run.
+        :param termination_fitness: Fitting stops if termination_fitness has been reached.
+                                    If None, all generations are performed.
         :param verbose: Whether or not additional data should be printed during fitting.
         :param visualize: Whether or not to visualize population during fitting.
+        :param vis_sleep: Sleep timer between each generation. Controls speed of visualization.
         """
 
         self.population_history = []
@@ -174,6 +191,9 @@ class GeneticAlgorithm(ABC):
 
             entropy = self.calculate_entropy(self.population)
             self.entropy_history.append(entropy)
+
+            if termination_fitness is not None and fitness_stats[-1] >= termination_fitness:  # Checks mean fitness
+                break
             if verbose:
                 print(f'Entropy: {round(entropy, 2)}')
                 fitness_table = PrettyTable(['Sum', 'Max', 'Mean'], title='Fitness')
@@ -188,7 +208,7 @@ class GeneticAlgorithm(ABC):
                 points.set_ydata(y)
                 fig.canvas.draw()
                 fig.canvas.flush_events()
-                time.sleep(0.5)
+                time.sleep(vis_sleep)
 
             self.population_history.append(self.population.copy())
             parents = self._parent_selection(self.population)
@@ -199,31 +219,6 @@ class GeneticAlgorithm(ABC):
         self.population_history = np.asarray(self.population_history)
         self.fitness_history = np.asarray(self.fitness_history)
         self.entropy_history = np.asarray(self.entropy_history)
-
-    def visualize_fitness(self):
-        """Visualizes fitness metrics from the last fit.
-
-        For each generation the sum, max, and mean of fitness over the whole generation is plotted.
-        """
-        plt.ioff()
-        fig, ax = plt.subplots(1, 3, figsize=(12, 12))
-        for i, f in enumerate(['Sum', 'Max', 'Mean']):
-            ax[i].plot(self.fitness_history[:, i])
-            ax[i].set_title(f)
-            ax[i].set_xlabel('Generation')
-
-            if i == 0:
-                ax[i].set_ylabel(f'Fitness')
-        plt.show()
-
-    def visualize_entropy(self):
-        plt.ioff()
-        fig, ax = plt.subplots(figsize=(12, 12))
-        ax.plot(self.entropy_history)
-        ax.set_title('Entropy')
-        ax.set_xlabel('Generation')
-        ax.set_ylabel(f'Entropy')
-        plt.show()
 
 
 class SimpleGeneticAlgorithm(GeneticAlgorithm):
@@ -244,7 +239,6 @@ class GeneralizedCrowding(GeneticAlgorithm):
     def _competition(self, parent: np.ndarray, offspring: np.ndarray) -> np.ndarray:
         offspring_fitness = self.fitness_function(offspring)
         parent_fitness = self.fitness_function(parent)
-
         if offspring_fitness > parent_fitness:
             offspring_probability = offspring_fitness / (offspring_fitness + self._scaling_factor * parent_fitness)
             return offspring if np.random.random() < offspring_probability else parent
@@ -268,11 +262,11 @@ class GeneralizedCrowding(GeneticAlgorithm):
             h1 = self.hamming_distance(p1, o1) + self.hamming_distance(p2, o2)
             h2 = self.hamming_distance(p1, o2) + self.hamming_distance(p2, o1)
             if h1 < h2:  # Competitions: [(p1, o1), (p2, o2)]
-                survivor_population[i] = self._competition(p1, o1)
-                survivor_population[i + 1] = self._competition(p2, o2)
+                survivor_population[i*2] = self._competition(p1, o1)
+                survivor_population[i*2 + 1] = self._competition(p2, o2)
             else:  # Competitions: [(p1, o2), (p2, o1)]
-                survivor_population[i] = self._competition(p1, o2)
-                survivor_population[i + 1] = self._competition(p2, o1)
+                survivor_population[i*2] = self._competition(p1, o2)
+                survivor_population[i*2 + 1] = self._competition(p2, o1)
 
         return survivor_population
 
@@ -290,7 +284,5 @@ class ProbabilisticCrowding(GeneralizedCrowding):
 if __name__ == '__main__':
     def f(p):
         return p.sum()
-
-    #print(GeneralizedCrowding(fitness_function=f)._competition(np.array([1,1]), np.array([0,1])))
 
     print(GeneticAlgorithm.calculate_entropy(np.array([[1,0,1],[0,0,0], [1,1,0]])))
