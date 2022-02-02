@@ -5,6 +5,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from prettytable import PrettyTable
 
+from project1.fitness.fitness_functions import RealValueFitnessFunction
+
 
 class GeneticAlgorithm(ABC):
     def __init__(self,
@@ -169,6 +171,10 @@ class GeneticAlgorithm(ABC):
         :param vis_sleep: Sleep timer between each generation. Controls speed of visualization.
         """
 
+        # Only visualize if the fitness function is a real value fitness function.
+        # Not visualizing for regression tasks.
+        visualize = visualize and issubclass(self.fitness_function, RealValueFitnessFunction)
+
         self.population_history = []
         self.fitness_history = []
         self.entropy_history = []
@@ -200,7 +206,6 @@ class GeneticAlgorithm(ABC):
                 fitness_table = PrettyTable(['Sum', 'Max', 'Mean'], title='Fitness')
                 fitness_table.add_row([round(s, 2) for s in fitness_stats])
                 print(fitness_table)
-
             if visualize:
                 ax.set_title(f'Generation {g}')
                 x = self.fitness_function.bits_to_scaled_nums(self.population)

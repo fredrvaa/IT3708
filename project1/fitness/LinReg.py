@@ -34,7 +34,7 @@ class LinReg():
             if s=='0':
                 indexes.append(i)
         arr = np.asarray(x)
-        arr = np.delete(arr, indexes)
+        arr = np.delete(arr, indexes, axis=1)
         return arr
 
 

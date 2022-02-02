@@ -1,14 +1,9 @@
-import numpy as np
-
 from evolution.genetic_algorithm import SimpleGeneticAlgorithm, DeterministicCrowding, ProbabilisticCrowding, \
     GeneralizedCrowding
 from evolution.visualizer import Visualizer
-from fitness.fitness_functions import SineFitness, SquaredFitness, LinearWithSineFitness
-from data_utils.dataset import Dataset
+from fitness.fitness_functions import SineFitness
 
-dataset = Dataset.read_file('dataset.txt')
-
-fitness_function = SineFitness(interval=(0, 128), target_interval=None, distance_factor=0.1)
+fitness_function = SineFitness(interval=(0, 128), target_interval=(5, 10), distance_factor=0.1)
 termination_fitness = None
 algos = []
 
