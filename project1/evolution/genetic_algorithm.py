@@ -184,6 +184,7 @@ class GeneticAlgorithm(ABC):
             ax.set_ylabel('Fitness')
             points, = ax.plot(x_func, y_func, 'ro')
 
+        print(self.__class__.__name__)
         for g in range(generations):
             print(f'Generation {g}')
             fitness_stats = self._get_fitness_stats()
