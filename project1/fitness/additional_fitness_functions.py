@@ -1,3 +1,5 @@
+import numpy as np
+
 from fitness.fitness_functions import RealValueFitnessFunction
 
 
