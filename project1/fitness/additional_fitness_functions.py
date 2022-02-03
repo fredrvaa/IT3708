@@ -56,7 +56,7 @@ class CosineFitness(RealValueFitnessFunction):
         :return: A (Nx1) numpy array consisting of the fitness (x**3) of the population.
         """
 
-        return np.cos(phenome) + 1  # Add 1 to force non-negative fitness values
+        return np.cos(phenomes) + 1  # Add 1 to force non-negative fitness values
 
 
 class LinearWithSineFitness(RealValueFitnessFunction):
