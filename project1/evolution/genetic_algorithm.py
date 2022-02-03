@@ -1,3 +1,4 @@
+import pickle
 import time
 from abc import ABC, abstractmethod
 
@@ -241,6 +242,31 @@ class GeneticAlgorithm(ABC):
         self.population_history = np.asarray(self.population_history)
         self.fitness_history = np.asarray(self.fitness_history)
         self.entropy_history = np.asarray(self.entropy_history)
+
+    def save(self, file_name: str) -> None:
+        """Saves the GeneticAlgorithm object to a file.
+
+        Useful to save population and histories after fitting.
+
+        :param file_name: File name of where to save. Expects that folder where file should be created exists.
+        """
+
+        with open(file_name, 'wb') as file:
+            pickle.dump(self, file, pickle.HIGHEST_PROTOCOL)
+
+    @staticmethod
+    def load(file_name: str) -> 'Network':
+        """Loads a GeneticAlgorithm object from a file.
+
+        Useful to load population and histories from previously run fit.
+
+        :param file_name: File name of saved object.
+        :return: A GeneticAlgorithm object as specified by the file.
+        """
+
+        with open(file_name, 'rb') as file:
+            network = pickle.load(file)
+        return network
 
 
 class SimpleGeneticAlgorithm(GeneticAlgorithm):
