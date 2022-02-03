@@ -11,7 +11,7 @@ class Visualizer:
 
         plt.ioff()
 
-    def visualize_fitness(self):
+    def visualize_fitness(self, baseline: float = None):
         """Visualizes fitness metrics from the last fit of all fitted_algorithms passed in the constructor.
 
         For each generation the sum, max/min, and mean of fitness over all generations are plotted.
@@ -25,6 +25,9 @@ class Visualizer:
 
             for algo in self.fitted_algorithms:
                 ax[i].plot(algo.fitness_history[:, i], label=algo.__class__.__name__)
+
+            if baseline is not None and i != 0:  # Don't plot baseline on sum plot
+                ax[i].axhline(y=baseline, color='r', linestyle='--', label='Baseline')
 
             if i == 0:
                 ax[i].set_ylabel(f'Fitness')
