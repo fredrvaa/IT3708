@@ -9,6 +9,8 @@ from fitness.fitness_functions import RealValueFitnessFunction
 
 
 class GeneticAlgorithm(ABC):
+    """The base class used to implement different kinds of genetic algorithms (e.g. SGA and crowding)."""
+
     def __init__(self,
                  population_size: int = 32,
                  n_bits: int = 8,
@@ -83,6 +85,7 @@ class GeneticAlgorithm(ABC):
         :param fitness: A (Nx1) numpy array specifying the fitness of each individual in the population.
         :return: A (Nx1) numpy array of the probabilities that an individual will be chosen as a parent.
         """
+
         if not self.fitness_function.maximizing:
             fitness = (fitness.max() - fitness).clip(min=epsilon)
 
@@ -93,6 +96,7 @@ class GeneticAlgorithm(ABC):
 
         :return: A multiset chosen from the current population.
         """
+
         parent_population = population.copy()
 
         fitness = self.fitness_function(population=parent_population)
@@ -146,9 +150,15 @@ class GeneticAlgorithm(ABC):
         mutated_population[idx] = 1 - mutated_population[idx]
         return mutated_population
 
-
     @abstractmethod
     def _survivor_selection(self, parents: np.ndarray, offspring: np.ndarray) -> np.ndarray:
+        """Selects and returns survivors for the next generation.
+
+        :param parents: A numpy array of the parents of the current generation.
+        :param offspring: A numpy array of the offsprings of the current generation.
+        :return: A numpy array of the survivors for the next generation.
+        """
+
         raise NotImplementedError('Subclass must implement _survivor_selection() method.')
 
     def fit(self,
@@ -158,6 +168,7 @@ class GeneticAlgorithm(ABC):
             visualize: bool = False,
             vis_sleep: float = 0.1,
             ) -> None:
+
         """Fits the population through a generational loop.
 
         For each generation the following is done:
@@ -233,27 +244,59 @@ class GeneticAlgorithm(ABC):
 
 
 class SimpleGeneticAlgorithm(GeneticAlgorithm):
+    """This class inherits from GeneticAlgorithm, and implements the simplest form of survivor selection."""
+
     def _survivor_selection(self, parents: np.ndarray, offspring: np.ndarray) -> np.ndarray:
+        """For this SGA, the offspring is the next generation.
+
+        :param parents: A numpy array of the parents of the current generation.
+        :param offspring: A numpy array of the offsprings of the current generation.
+        :return: A numpy array of the survivors for the next generation.
+        """
+
         return offspring
 
 
 class GeneralizedCrowding(GeneticAlgorithm):
+    """This class inherits from GeneticAlgorithm, and implements a generalized
+       local tournament to select the survivors for the next generation.
+    """
+
     def __init__(self, scaling_factor: float = 0.5, *args, **kwargs):
+        """
+        :param scaling_factor: Parameter used for getting winner probabilities in the competition.
+        """
+
         super().__init__(*args, **kwargs)
 
         self._scaling_factor = scaling_factor
 
     @staticmethod
     def hamming_distance(a1: np.ndarray, a2: np.ndarray) -> int:
+        """Calculates the hamming distance between two bit arrays.
+
+        :param a1: First numpy array.
+        :param a2: Second numpy array.
+        :return: The hamming distance between a1 and a2.
+        """
+
         return np.count_nonzero(a1 != a2)
 
     def _competition(self, parent: np.ndarray, offspring: np.ndarray, epsilon: float = 1e-12) -> np.ndarray:
+        """Parent competes against offspring in a fitness competition. The winner is returned.
+
+        :param parent: Numpy array of the parent.
+        :param offspring: Numpy array of the offspring
+        :param epsilon: Parameter used to ensure we don't divide by zero.
+        :return: The winner of the competition.
+        """
+
         offspring_fitness = self.fitness_function(offspring)
         parent_fitness = self.fitness_function(parent)
         if not self.fitness_function.maximizing:
             max_fitness = max(offspring_fitness.max(), parent_fitness.max())
-            offspring_fitness = (max_fitness - offspring_fitness)
-            parent_fitness = (max_fitness - parent_fitness)
+            offspring_fitness = (max_fitness - offspring_fitness).clip(min=epsilon)
+            parent_fitness = (max_fitness - parent_fitness).clip(min=epsilon)
 
         if offspring_fitness > parent_fitness:
             offspring_probability = offspring_fitness / (offspring_fitness + self._scaling_factor * parent_fitness)
@@ -266,13 +309,15 @@ class GeneralizedCrowding(GeneticAlgorithm):
             return offspring if np.random.random() < 0.5 else parent
 
     def _survivor_selection(self, parents: np.ndarray, offspring: np.ndarray) -> np.ndarray:
+        """Parents and offspring competes in a local tournament.
+
+        The winners are selected as survivors for the next generation.
+
+        :param parents: A numpy array of the parents of the current generation.
+        :param offspring: A numpy array of the offsprings of the current generation.
+        :return: A numpy array of the survivors for the next generation.
         """
-        Parents: [p1, p2, p3]; Offspring: [o1, o2, o3]
-        Competitions: [(p1, o1)]
-        :param parents:
-        :param offspring:
-        :return:
-        """
+
         survivor_population = offspring.copy()
         for i, (p1, p2, o1, o2) in enumerate(zip(parents[::2], parents[1::2], offspring[::2], offspring[1::2])):
             h1 = self.hamming_distance(p1, o1) + self.hamming_distance(p2, o2)
@@ -288,17 +333,14 @@ class GeneralizedCrowding(GeneticAlgorithm):
 
 
 class DeterministicCrowding(GeneralizedCrowding):
+    """This is a special case of the GeneralizedCrowding, with the scaling factor used in competition set to 0."""
+
     def __init__(self, *args, **kwargs):
         super().__init__(scaling_factor=0, *args, **kwargs)
 
 
 class ProbabilisticCrowding(GeneralizedCrowding):
+    """This is a special case of the GeneralizedCrowding, with the scaling factor used in competition set to 1."""
+
     def __init__(self, *args, **kwargs):
         super().__init__(scaling_factor=1, *args, **kwargs)
-
-
-if __name__ == '__main__':
-    def f(p):
-        return p.sum()
-
-    print(GeneticAlgorithm.calculate_entropy(np.array([[1,0,1],[0,0,0], [1,1,0]])))

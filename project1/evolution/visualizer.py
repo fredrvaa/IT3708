@@ -4,15 +4,17 @@ from evolution.genetic_algorithm import GeneticAlgorithm
 
 
 class Visualizer:
+    """Utility class used to visualize plots from fitting genetic algorithms."""
+
     def __init__(self, fitted_algorithms: list[GeneticAlgorithm]):
         self.fitted_algorithms = fitted_algorithms
 
         plt.ioff()
 
     def visualize_fitness(self):
-        """Visualizes fitness metrics from the last fit.
+        """Visualizes fitness metrics from the last fit of all fitted_algorithms passed in the constructor.
 
-        For each generation the sum, max/min, and mean of fitness over the whole generation is plotted.
+        For each generation the sum, max/min, and mean of fitness over all generations are plotted.
         """
 
         fig, ax = plt.subplots(1, 3, figsize=(12, 12))
@@ -31,6 +33,8 @@ class Visualizer:
         plt.show()
 
     def visualize_entropy(self):
+        """Visualizes entropy from the last fit of all fitted_algorithms passed in the constructor."""
+
         fig, ax = plt.subplots(figsize=(12, 12))
         ax.set_title('Entropy')
         ax.set_xlabel('Generation')
