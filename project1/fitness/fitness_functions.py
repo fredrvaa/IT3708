@@ -35,8 +35,9 @@ class RealValueFitnessFunction(FitnessFunction):
     def __init__(self,
                  interval: tuple[int, int] = (0, 16),
                  target_interval: tuple[int, int] = None,
-                 distance_factor: float = 0.05):
-        super().__init__(maximizing=True)
+                 distance_factor: float = 0.05,
+                 *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.interval = interval
         self.target_interval = target_interval
         self.distance_factor = distance_factor
@@ -114,8 +115,8 @@ class RealValueFitnessFunction(FitnessFunction):
 
 
 class LinearRegressionFitness(FitnessFunction):
-    def __init__(self, dataset: Dataset):
-        super().__init__(maximizing=False)
+    def __init__(self, dataset: Dataset, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.dataset = dataset
 
     @staticmethod
@@ -128,13 +129,12 @@ class LinearRegressionFitness(FitnessFunction):
             if np.count_nonzero(phenome) == 0:
                 fitness.append(0)
             else:
-                print("x:", phenome)
-                print("y:", self.dataset.y)
+                # print("x:", phenome)
+                # print("y:", self.dataset.y)
                 fitness.append(LinReg().get_fitness(phenome, self.dataset.y))
         return np.asarray(fitness)
 
     def __call__(self, population: np.ndarray):
-        fitness = []
         phenomes = []
         for genome in np.atleast_2d(population):
             phenomes.append(LinReg().get_columns(self.dataset.x, self.bitlist_to_bitstring(genome)))
@@ -142,8 +142,11 @@ class LinearRegressionFitness(FitnessFunction):
 
 class SineFitness(RealValueFitnessFunction):
     """Fitness function using sin(x)."""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-    def fitness(self, phenomes: np.ndarray) -> np.ndarray:
+    def fitness(self, phenomes: np.ndarray, *args, **kwargs) -> np.ndarray:
+
         """Calculates fitness of a population according to sin(x).
 
         :param phenomes: A (Nx1) numpy array consisting of a populations phenomes.

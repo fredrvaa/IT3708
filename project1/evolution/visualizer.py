@@ -12,11 +12,12 @@ class Visualizer:
     def visualize_fitness(self):
         """Visualizes fitness metrics from the last fit.
 
-        For each generation the sum, max, and mean of fitness over the whole generation is plotted.
+        For each generation the sum, max/min, and mean of fitness over the whole generation is plotted.
         """
 
         fig, ax = plt.subplots(1, 3, figsize=(12, 12))
-        for i, f in enumerate(['Sum', 'Max', 'Mean']):
+        max_or_min = 'Max' if self.fitted_algorithms[0].fitness_function.maximizing else 'Min'
+        for i, f in enumerate(['Sum', max_or_min, 'Mean']):
             ax[i].set_title(f)
             ax[i].set_xlabel('Generation')
 

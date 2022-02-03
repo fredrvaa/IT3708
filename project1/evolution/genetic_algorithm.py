@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from prettytable import PrettyTable
 
-from project1.fitness.fitness_functions import RealValueFitnessFunction
+from fitness.fitness_functions import RealValueFitnessFunction
 
 
 class GeneticAlgorithm(ABC):
@@ -13,7 +13,6 @@ class GeneticAlgorithm(ABC):
                  population_size: int = 32,
                  n_bits: int = 8,
                  fitness_function=None,
-                 maximize: bool = True,
                  p_cross_over: float = 0.6,
                  p_mutation: float = 0.05,
                  offspring_multiplier: int = 1):
@@ -21,7 +20,6 @@ class GeneticAlgorithm(ABC):
         :param population_size: Number of individuals in population.
         :param n_bits: Number of bits used to represent each individual.
         :param fitness_function: Fitness function to use during evolution.
-        :param maximize: Whether or not to maximize fitness (otherwise minimize).
         :param p_cross_over: Probability of crossover of two parents.
         :param p_mutation: Probability of mutating offspring.
         :param offspring_multiplier: Decides how many offspring are created in each generation:
@@ -35,7 +33,6 @@ class GeneticAlgorithm(ABC):
             raise TypeError('fitness_function must be specified')
 
         self.fitness_function = fitness_function
-        self.maximize: bool = maximize
         self.p_cross_over: float = p_cross_over
         self.p_mutation: float = p_mutation
         self.offspring_multiplier = offspring_multiplier
@@ -67,15 +64,18 @@ class GeneticAlgorithm(ABC):
         return -np.dot(probabilities, np.log2(probabilities))
 
     def _get_fitness_stats(self) -> np.ndarray:
-        """Calculates fitness of whole population and returns sum, max, and mean of these.
+        """Calculates fitness of whole population and returns sum, max/min, and mean of these.
 
         :return: A (3x1) numpy array of the sum, max, and mean of the fitness of the population.
         """
 
         fitness: np.ndarray = self.fitness_function(population=self.population)
-        return np.array([fitness.sum(), fitness.max(), fitness.mean()])
+        if self.fitness_function.maximizing:
+            return np.array([fitness.sum(), fitness.max(), fitness.mean()])
+        else:
+            return np.array([fitness.sum(), fitness.min(), fitness.mean()])
 
-    def _get_selection_probabilities(self, fitness: np.ndarray) -> np.ndarray:
+    def _get_selection_probabilities(self, fitness: np.ndarray, epsilon: float = 1e-18) -> np.ndarray:
         """Calculates selection probabilities from a fitness vector.
 
         The probabilities are calculated using the roulette wheel method.
@@ -83,6 +83,8 @@ class GeneticAlgorithm(ABC):
         :param fitness: A (Nx1) numpy array specifying the fitness of each individual in the population.
         :return: A (Nx1) numpy array of the probabilities that an individual will be chosen as a parent.
         """
+        if not self.fitness_function.maximizing:
+            fitness = (fitness.max() - fitness).clip(min=epsilon)
 
         return fitness / fitness.sum()
 
@@ -173,7 +175,7 @@ class GeneticAlgorithm(ABC):
 
         # Only visualize if the fitness function is a real value fitness function.
         # Not visualizing for regression tasks.
-        visualize = visualize and issubclass(self.fitness_function, RealValueFitnessFunction)
+        visualize = visualize and issubclass(type(self.fitness_function), RealValueFitnessFunction)
 
         self.population_history = []
         self.fitness_history = []
@@ -199,12 +201,15 @@ class GeneticAlgorithm(ABC):
             entropy = self.calculate_entropy(self.population)
             self.entropy_history.append(entropy)
 
-            if termination_fitness is not None and fitness_stats[-1] >= termination_fitness:  # Checks mean fitness
-                break
+            if termination_fitness is not None:
+                if (self.fitness_function.maximizing and fitness_stats[-1] >= termination_fitness) or \
+                   (not self.fitness_function.maximizing and fitness_stats[-1] <= termination_fitness):
+                    break
             if verbose:
                 print(f'Entropy: {round(entropy, 2)}')
-                fitness_table = PrettyTable(['Sum', 'Max', 'Mean'], title='Fitness')
-                fitness_table.add_row([round(s, 2) for s in fitness_stats])
+                max_or_min = 'Max' if self.fitness_function.maximizing else 'Min'
+                fitness_table = PrettyTable(['Sum', max_or_min, 'Mean'], title='Fitness')
+                fitness_table.add_row([round(s, 4) for s in fitness_stats])
                 print(fitness_table)
             if visualize:
                 ax.set_title(f'Generation {g}')
@@ -242,9 +247,14 @@ class GeneralizedCrowding(GeneticAlgorithm):
     def hamming_distance(a1: np.ndarray, a2: np.ndarray) -> int:
         return np.count_nonzero(a1 != a2)
 
-    def _competition(self, parent: np.ndarray, offspring: np.ndarray) -> np.ndarray:
+    def _competition(self, parent: np.ndarray, offspring: np.ndarray, epsilon: float = 1e-12) -> np.ndarray:
         offspring_fitness = self.fitness_function(offspring)
         parent_fitness = self.fitness_function(parent)
+        if not self.fitness_function.maximizing:
+            max_fitness = max(offspring_fitness.max(), parent_fitness.max())
+            offspring_fitness = (max_fitness - offspring_fitness)
+            parent_fitness = (max_fitness - parent_fitness)
+
         if offspring_fitness > parent_fitness:
             offspring_probability = offspring_fitness / (offspring_fitness + self._scaling_factor * parent_fitness)
             return offspring if np.random.random() < offspring_probability else parent
