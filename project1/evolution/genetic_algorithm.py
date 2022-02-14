@@ -1,6 +1,7 @@
 import pickle
 import time
 from abc import ABC, abstractmethod
+from typing import Optional
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -62,8 +63,7 @@ class GeneticAlgorithm(ABC):
 
     @staticmethod
     def calculate_entropy(population: np.ndarray, epsilon=1e-12) -> float:
-        probabilities = population.mean(axis=0)
-        probabilities = probabilities.clip(min=epsilon)
+        probabilities = population.mean(axis=0).clip(min=epsilon)
         return -np.dot(probabilities, np.log2(probabilities))
 
     def _get_fitness_stats(self) -> np.ndarray:
@@ -88,9 +88,12 @@ class GeneticAlgorithm(ABC):
         """
 
         if not self.fitness_function.maximizing:
-            fitness = (fitness.max() - fitness).clip(min=epsilon)
+            fitness *= -1
+            #print("min")
+        #print(fitness)
 
-        return fitness / fitness.sum()
+        #fitness = fitness.clip(min=epsilon)
+        return np.exp(fitness) / np.exp(fitness).sum()
 
     def _parent_selection(self, population: np.ndarray):
         """Selects parents for the next generation of the population.
@@ -164,7 +167,7 @@ class GeneticAlgorithm(ABC):
 
     def fit(self,
             generations: int = 100,
-            termination_fitness: float = None,
+            termination_fitness: Optional[float] = None,
             verbose: bool = False,
             visualize: bool = False,
             vis_sleep: float = 0.1,
@@ -196,13 +199,15 @@ class GeneticAlgorithm(ABC):
         if visualize:
             plt.ion()
             fig, ax = plt.subplots(figsize=(12, 12))
+            fig.suptitle(f'{self.__class__.__name__} on {self.fitness_function.__class__.__name__}')
             interval = self.fitness_function.interval
             x_func = np.linspace(interval[0], interval[1], 10*(interval[1] - interval[0]))
             y_func = self.fitness_function.fitness(x_func)
             ax.plot(x_func, y_func)
             ax.set_xlabel('Value')
             ax.set_ylabel('Fitness')
-            points, = ax.plot(x_func, y_func, 'ro')
+            points, = ax.plot(x_func, y_func, 'ro', label='Population')
+            ax.legend()
 
         print(self.__class__.__name__)
         for g in range(generations):
@@ -243,6 +248,10 @@ class GeneticAlgorithm(ABC):
         self.fitness_history = np.asarray(self.fitness_history)
         self.entropy_history = np.asarray(self.entropy_history)
 
+    def fittest_individual(self):
+        fitness = self.fitness_function(population=self.population)
+        return self.population[np.argmax(fitness)]
+
     def save(self, file_name: str) -> None:
         """Saves the GeneticAlgorithm object to a file.
 
@@ -281,6 +290,25 @@ class SimpleGeneticAlgorithm(GeneticAlgorithm):
         """
 
         return offspring
+
+
+class FittestGeneticAlgorithm(GeneticAlgorithm):
+    """This class inherits from GeneticAlgorithm, and selects the fittest individuals to survive."""
+
+    def _survivor_selection(self, parents: np.ndarray, offspring: np.ndarray) -> np.ndarray:
+        """Selects the fittest to survive.
+
+        :param parents: A numpy array of the parents of the current generation.
+        :param offspring: A numpy array of the offsprings of the current generation.
+        :return: A numpy array of the survivors for the next generation.
+        """
+        survivors = np.concatenate((parents, offspring), axis=0)
+        fitness = self.fitness_function(survivors)
+        if self.fitness_function.maximizing:
+            fitness *= -1
+
+        indeces = np.argsort(fitness)[:self.population_size]
+        return survivors[indeces]
 
 
 class GeneralizedCrowding(GeneticAlgorithm):
@@ -323,16 +351,16 @@ class GeneralizedCrowding(GeneticAlgorithm):
             max_fitness = max(offspring_fitness.max(), parent_fitness.max())
             offspring_fitness = (max_fitness - offspring_fitness).clip(min=epsilon)
             parent_fitness = (max_fitness - parent_fitness).clip(min=epsilon)
-
+            # offspring_fitness *= -1
+            # parent_fitness *= -1
         if offspring_fitness > parent_fitness:
             offspring_probability = offspring_fitness / (offspring_fitness + self._scaling_factor * parent_fitness)
-            return offspring if np.random.random() < offspring_probability else parent
         elif offspring_fitness < parent_fitness:
             scaled_offspring_fitness = self._scaling_factor * offspring_fitness
             offspring_probability = scaled_offspring_fitness / (scaled_offspring_fitness + parent_fitness)
-            return offspring if np.random.random() < offspring_probability else parent
         else:
-            return offspring if np.random.random() < 0.5 else parent
+            offspring_probability = 0.5
+        return offspring if np.random.random() < offspring_probability else parent
 
     def _survivor_selection(self, parents: np.ndarray, offspring: np.ndarray) -> np.ndarray:
         """Parents and offspring competes in a local tournament.

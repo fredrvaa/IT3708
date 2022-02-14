@@ -140,7 +140,6 @@ class RealValueFitnessFunction(FitnessFunction):
         else:
             fitness = self.fitness(phenomes)
 
-        fitness = fitness.clip(min=0)
         return fitness
 
 
@@ -156,7 +155,7 @@ class SineFitness(RealValueFitnessFunction):
         :return: A (Nx1) numpy array consisting of the fitness (sin(x)) of the population.
         """
 
-        return np.sin(phenomes) + 1  # Add 1 to force non-negative fitness values
+        return np.sin(phenomes)
 
 
 class LinearRegressionFitness(FitnessFunction):
@@ -192,7 +191,8 @@ class LinearRegressionFitness(FitnessFunction):
         fitness = []
         for phenome in phenomes:
             if np.count_nonzero(phenome) == 0:
-                fitness.append(0)
+                print("ok")
+                fitness.append(0.1328)  # Found by running LinReg with all features
             else:
                 # print("x:", phenome)
                 # print("y:", self.dataset.y)
