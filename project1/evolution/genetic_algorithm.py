@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from prettytable import PrettyTable
 
-from fitness.fitness_functions import RealValueFitnessFunction
+from fitness.fitness_functions import RealValueFitnessFunction, FitnessFunction
 
 
 class GeneticAlgorithm(ABC):
@@ -16,7 +16,7 @@ class GeneticAlgorithm(ABC):
     def __init__(self,
                  population_size: int = 32,
                  n_bits: int = 8,
-                 fitness_function=None,
+                 fitness_function: FitnessFunction = None,
                  p_cross_over: float = 0.6,
                  p_mutation: float = 0.05,
                  offspring_multiplier: int = 1):
@@ -62,8 +62,14 @@ class GeneticAlgorithm(ABC):
         return np.random.randint(0, 2, (population_size, n_bits))
 
     @staticmethod
-    def calculate_entropy(population: np.ndarray, epsilon=1e-12) -> float:
-        probabilities = population.mean(axis=0).clip(min=epsilon)
+    def calculate_entropy(population: np.ndarray, epsilon: float = 1e-18) -> float:
+        """Calculates entropy of a population.
+
+        :param population: A (Nxb) numpy array of a population.
+        :param epsilon: Minimum probability to avoid taking log of 0.
+        :return: Entropy of population
+        """
+        probabilities = population.mean(axis=0).clip(min=epsilon)  # Clip to avoid taking log of 0.
         return -np.dot(probabilities, np.log2(probabilities))
 
     def _get_fitness_stats(self) -> np.ndarray:
@@ -78,7 +84,7 @@ class GeneticAlgorithm(ABC):
         else:
             return np.array([fitness.sum(), fitness.min(), fitness.mean()])
 
-    def _get_selection_probabilities(self, fitness: np.ndarray, epsilon: float = 1e-18) -> np.ndarray:
+    def _get_selection_probabilities(self, fitness: np.ndarray) -> np.ndarray:
         """Calculates selection probabilities from a fitness vector.
 
         The probabilities are calculated using the roulette wheel method.
@@ -89,13 +95,10 @@ class GeneticAlgorithm(ABC):
 
         if not self.fitness_function.maximizing:
             fitness *= -1
-            #print("min")
-        #print(fitness)
 
-        #fitness = fitness.clip(min=epsilon)
         return np.exp(fitness) / np.exp(fitness).sum()
 
-    def _parent_selection(self, population: np.ndarray):
+    def _parent_selection(self, population: np.ndarray) -> np.ndarray:
         """Selects parents for the next generation of the population.
 
         :return: A multiset chosen from the current population.
@@ -179,6 +182,7 @@ class GeneticAlgorithm(ABC):
         1. Selection
         2. Cross over
         3. Mutation
+        4. Survivor selection
 
         :param generations: Number of generations the algorithm should run.
         :param termination_fitness: Fitting stops if termination_fitness has been reached.
@@ -209,9 +213,8 @@ class GeneticAlgorithm(ABC):
             points, = ax.plot(x_func, y_func, 'ro', label='Population')
             ax.legend()
 
-        print(self.__class__.__name__)
         for g in range(generations):
-            print(f'Generation {g}')
+            print(f'Generation {g} - {self.__class__.__name__}')
             fitness_stats = self._get_fitness_stats()
             self.fitness_history.append(fitness_stats)
 
@@ -248,7 +251,11 @@ class GeneticAlgorithm(ABC):
         self.fitness_history = np.asarray(self.fitness_history)
         self.entropy_history = np.asarray(self.entropy_history)
 
-    def fittest_individual(self):
+    def fittest_individual(self) -> np.ndarray:
+        """Returns the currently fittest individual
+        :return: A (1xb) numpy array of the fittest individual.
+        """
+
         fitness = self.fitness_function(population=self.population)
         return self.population[np.argmax(fitness)]
 
