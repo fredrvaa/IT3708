@@ -136,7 +136,8 @@ class RealValueFitnessFunction(FitnessFunction):
         phenomes = self.bits_to_scaled_nums(population)
 
         if self.target_interval is not None:
-            fitness = self.fitness(phenomes) - self._distance_penalty(phenomes)
+            penalty = self._distance_penalty(phenomes) if self.maximizing else - self._distance_penalty(phenomes)
+            fitness = self.fitness(phenomes) - penalty
         else:
             fitness = self.fitness(phenomes)
 
