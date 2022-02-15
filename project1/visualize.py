@@ -16,7 +16,6 @@ dataset = Dataset.load('dataset.txt')
 baseline = LinReg().get_fitness(dataset.x, dataset.y)
 
 algos = [GeneticAlgorithm.load(os.path.join(args.folder, x)) for x in os.listdir(args.folder)]
-print(algos)
 
 visualizer = Visualizer(algos)
 
