@@ -70,6 +70,7 @@ for algo in algos:
              visualize=args.visualize,
              vis_sleep=0,
              termination_fitness=args.termination_fitness)
+    algo.save(f'save_data/sine/{algo.__class__.__name__}_{args.generations}.pkl')
 
 visualizer = Visualizer(algos)
 visualizer.visualize_fitness()
